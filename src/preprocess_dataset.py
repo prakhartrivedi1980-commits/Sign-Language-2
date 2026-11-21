@@ -1,40 +1,97 @@
 
-import cv2
+import argparse
 import csv
 import random
+import cv2
 import mediapipe as mp
 
 from pathlib import Path
 from collections import Counter
 
-# Project paths
 ROOT = Path(__file__).resolve().parent.parent
 DATASET_DIR = ROOT / "dataset"
 MODEL_PATH = ROOT / "models" / "hand_landmarker.task"
-OUTPUT = DATASET_DIR / "asl_landmarks_pilot.csv"
 
-LETTERS = ["A", "B", "C", "D", "E"]
-SAMPLES_PER_LETTER = 200
-SEED = 42
+LETTERS = [
+    c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if c not in "JZ"
+]
 
-random.seed(SEED)
+parser = argparse.ArgumentParser()
 
-# Find the folder containing alphabet directories
+parser.add_argument(
+    "--samples",
+    type=int,
+    default=500,
+    help="Maximum images per letter; 0 means all"
+)
+
+parser.add_argument(
+    "--resume",
+    action="store_true"
+)
+
+args = parser.parse_args()
+
+if args.samples < 0:
+    parser.error("--samples cannot be negative")
+
+OUTPUT = DATASET_DIR / "asl_landmarks_full.csv"
+
 def find_training_folder():
-    for folder in DATASET_DIR.rglob("*"):
-        if folder.is_dir():
-            if all((folder / letter).is_dir()
-                   for letter in LETTERS):
-                return folder
+    candidates = [DATASET_DIR]
+
+    candidates.extend(
+        p for p in DATASET_DIR.rglob("*")
+        if p.is_dir()
+        and "test" not in p.parts[-1].lower()
+    )
+
+    for folder in candidates:
+        if all(
+            (folder / letter).is_dir()
+            for letter in LETTERS
+        ):
+            return folder
 
     raise FileNotFoundError(
-        "Cannot find ASL training folders A, B, C, D, E"
+        "Cannot find the 24 ASL training folders."
     )
 
 TRAIN_DIR = find_training_folder()
-print("Training folder:", TRAIN_DIR)
 
-# MediaPipe Tasks API
+print("Training directory:", TRAIN_DIR)
+print("Letters:", LETTERS)
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(MODEL_PATH)
+
+header = ["label", "source_file"]
+
+for i in range(21):
+    header.extend([f"x{i}", f"y{i}", f"z{i}"])
+
+# Read already processed filenames when resuming
+processed = set()
+
+if args.resume and OUTPUT.exists():
+    with open(OUTPUT, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        if reader.fieldnames != header:
+            raise ValueError(
+                "Existing CSV has incompatible columns."
+            )
+
+        for row in reader:
+            processed.add(row["source_file"])
+
+elif OUTPUT.exists():
+    raise FileExistsError(
+        f"{OUTPUT} already exists. "
+        "Use --resume or move the old file first."
+    )
+
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
 HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
@@ -49,35 +106,50 @@ options = HandLandmarkerOptions(
     min_hand_detection_confidence=0.5
 )
 
-# CSV column names
-header = ["label", "source_file"]
-
-for i in range(21):
-    header.extend([f"x{i}", f"y{i}", f"z{i}"])
-
 counts = Counter()
 failures = Counter()
 
-with HandLandmarker.create_from_options(options) as detector:
-    with open(OUTPUT, "w", newline="") as csv_file:
-        writer = csv.writer(csv_file)
+mode = "a" if args.resume and OUTPUT.exists() else "w"
+
+with open(
+    OUTPUT, mode, newline="", encoding="utf-8"
+) as file:
+
+    writer = csv.writer(file)
+
+    if mode == "w":
         writer.writerow(header)
 
+    with HandLandmarker.create_from_options(options) as detector:
+
         for letter in LETTERS:
+
             image_dir = TRAIN_DIR / letter
 
             images = sorted(
                 p for p in image_dir.iterdir()
-                if p.suffix.lower() in
-                {".jpg", ".jpeg", ".png"}
+                if p.suffix.lower()
+                in {".jpg", ".jpeg", ".png"}
             )
 
-            random.shuffle(images)
-            images = images[:SAMPLES_PER_LETTER]
+            # Deterministic image selection
+            rng = random.Random(42)
+            rng.shuffle(images)
 
-            print(f"\nProcessing letter {letter}...")
+            if args.samples > 0:
+                images = images[:args.samples]
 
-            for image_path in images:
+            print(f"\nProcessing {letter}: {len(images)} images")
+
+            for index, image_path in enumerate(images, 1):
+
+                source = str(
+                    image_path.relative_to(DATASET_DIR)
+                )
+
+                if source in processed:
+                    continue
+
                 image = cv2.imread(str(image_path))
 
                 if image is None:
@@ -100,9 +172,8 @@ with HandLandmarker.create_from_options(options) as detector:
                     continue
 
                 hand = result.hand_landmarks[0]
-
-                # Normalize relative to wrist
                 wrist = hand[0]
+
                 features = []
 
                 for point in hand:
@@ -112,20 +183,27 @@ with HandLandmarker.create_from_options(options) as detector:
                         point.z - wrist.z
                     ])
 
-                writer.writerow([
-                    letter,
-                    str(image_path.relative_to(DATASET_DIR)),
-                    *features
-                ])
+                writer.writerow(
+                    [letter, source] + features
+                )
 
                 counts[letter] += 1
 
+                if index % 100 == 0:
+                    print(
+                        f"{letter}: {index}/{len(images)} "
+                        f"processed"
+                    )
+                    file.flush()
+
+            file.flush()
+
             print(
-                f"{letter}: {counts[letter]} saved, "
+                f"{letter}: {counts[letter]} new saved, "
                 f"{failures[letter]} failed"
             )
 
-print("\nPreprocessing completed!")
-print("Saved file:", OUTPUT)
-print("Successful detections:", dict(counts))
-print("Failed detections:", dict(failures))
+print("\nPreprocessing finished!")
+print("Output:", OUTPUT)
+print("New successful detections:", sum(counts.values()))
+print("New failed detections:", sum(failures.values()))

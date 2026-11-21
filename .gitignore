@@ -1,80 +1,31 @@
-
-# ==========================================
-# ASL Sign Language Recognition Project
-# ==========================================
-
-# Python virtual environments
+# Python environment
 .venv/
 venv/
-env/
-
-# Python cache files
 __pycache__/
-*.py[cod]
-*.pyo
+*.pyc
 
-# Python packaging
-*.egg-info/
-build/
-dist/
+# Datasets
+/dataset/*
+!/dataset/.gitkeep
 
-# Environment variables and secrets
+# Trained models
+*.keras
+*.h5
+*.task
+*.npz
+*.npy
+*.onnx
+
+# Generated evaluation results
+/results/
+
+# IDE and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment variables
 .env
 .env.*
 !.env.example
-
-# VS Code and IDE files
-.vscode/
-.idea/
-
-# Jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# ==========================================
-# DATASETS
-# ==========================================
-
-# Ignore downloaded datasets and generated CSVs
-dataset/*
-!dataset/.gitkeep
-
-# ==========================================
-# TRAINED MODELS
-# ==========================================
-
-# Ignore large model weights
-*.keras
-*.h5
-*.hdf5
-*.onnx
-*.pth
-*.pt
-*.tflite
-*.task
-
-# ==========================================
-# TRAINING OUTPUTS
-# ==========================================
-
-# Generated normalization and NumPy files
-*.npy
-*.npz
-
-# Logs and checkpoints
-logs/
-checkpoints/
-runs/
-tensorboard/
-*.log
-
-# ==========================================
-# SYSTEM FILES
-# ==========================================
-
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Temporary files
-*.tmp
-*.bak
