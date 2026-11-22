@@ -16,8 +16,16 @@ __pycache__/
 *.npy
 *.onnx
 
-# Generated evaluation results
-/results/
+# Ignore everything inside results
+/results/**
+
+# Allow Git to access subfolders
+!/results/**/
+
+# Allow only evaluation images
+!/results/**/*.png
+!/results/**/*.jpg
+!/results/**/*.jpeg
 
 # IDE and system files
 .vscode/
