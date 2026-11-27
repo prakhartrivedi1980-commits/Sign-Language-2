@@ -1,39 +1,43 @@
-# Python environment
+# Python virtual environments
 .venv/
 venv/
+env/
+
+# Python cache and compiled files
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Datasets
-/dataset/*
-!/dataset/.gitkeep
-
-# Trained models
-*.keras
-*.h5
-*.task
-*.npz
-*.npy
-*.onnx
-
-# Ignore everything inside results
-/results/**
-
-# Allow Git to access subfolders
-!/results/**/
-
-# Allow only evaluation images
-!/results/**/*.png
-!/results/**/*.jpg
-!/results/**/*.jpeg
-
-# IDE and system files
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Environment variables
+# Local settings and secrets
 .env
 .env.*
 !.env.example
+.vscode/
+.idea/
+
+# Temporary Keras files
+.keras_tmp/
+
+# Training dataset (not required for pretrained inference)
+dataset/
+
+# Generated outputs
+results/
+snapshots/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep pretrained inference artifacts in models/
+# These patterns are explicit so model assets stay tracked.
+!models/
+!models/*.keras
+!models/*.npz
+!models/*.task
+
+# Keep source, documentation, and presentation files tracked.
+/presentation/
+/docs/
